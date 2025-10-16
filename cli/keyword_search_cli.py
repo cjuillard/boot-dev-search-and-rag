@@ -17,6 +17,7 @@ class Tokenizer:
     tokens = [token for token in tokens if token not in self.stopwords]
     tokens = [self.stemmer.stem(token) for token in tokens]
     return tokens
+  
 class InvertedIndex:
   def __init__(self, tokenizer: Tokenizer):
     self.tokenizer = tokenizer
@@ -53,6 +54,10 @@ class InvertedIndex:
      os.makedirs("cache", exist_ok=True)
      pickle.dump(self.index, open("cache/index.pkl", "wb"))
      pickle.dump(self.docmap, open("cache/docmap.pkl", "wb"))
+  
+  def load(self):
+    self.index = pickle.load(open("cache/index.pkl", "rb"))
+    self.docmap = pickle.load(open("cache/docmap.pkl", "rb"))
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -80,22 +85,32 @@ def main() -> None:
         case "search":
             # print the search query here
             tokens = tokenizer.tokenize(args.query)
+            inverted_index = InvertedIndex(tokenizer)
+            inverted_index.load()
+
             print(f"Searching for: {args.query}")
-            for movie in movies:
-                movie_tokens = tokenizer.tokenize(movie["title"])
-                if(check_partial_match(tokens, movie_tokens)):
-                    matches.append(movie)
-                    continue
+
+            doc_ids = []
+            for token in tokens:
+                currDocs = inverted_index.get_documents(token)
+                for doc in currDocs:
+                    if doc not in doc_ids:
+                        doc_ids.append(doc)
+                        if len(doc_ids) >= 5:
+                           break
             
-            for i, match in enumerate(matches):
-                print(f"{i+1}. {match['title']}")
+
+            for doc in doc_ids:
+              movie = inverted_index.docmap[doc]
+              print(f"{doc} - {movie['title']}")
+              
         case "build":
             inverted_index = InvertedIndex(tokenizer)
             inverted_index.build(movies)
             inverted_index.save()
 
-            docs = inverted_index.get_documents("merida")
-            print(f"First document for token 'merida' = {docs[0]}")
+            doc_ids = inverted_index.get_documents("merida")
+            print(f"First document for token 'merida' = {doc_ids[0]}")
 
         case _:
             parser.print_help()
