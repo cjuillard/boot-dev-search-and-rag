@@ -15,14 +15,18 @@ def main() -> None:
 
     movies = json.load(open("data/movies.json"))["movies"]
 
+    stopwords_file = open("data/stopwords.txt")
+    stopwords = stopwords_file.read().splitlines()
+    stopwords = [sanitize_string(word) for word in stopwords]
+
     matches = []
     match args.command:
         case "search":
             # print the search query here
-            tokens = tokenize_string(sanitize_string(args.query))
+            tokens = generate_tokens(args.query, stopwords)
             print(f"Searching for: {args.query}")
             for movie in movies:
-                movie_tokens = tokenize_string(sanitize_string(movie["title"]))
+                movie_tokens = generate_tokens(movie["title"], stopwords)
                 if(check_partial_match(tokens, movie_tokens)):
                     matches.append(movie)
                     continue
@@ -43,6 +47,11 @@ def tokenize_string(s: str) -> list[str]:
     tokens = s.split()
     return tokens
     # tokens
+
+def generate_tokens(s: str, stopwords: list[str]) -> list[str]:
+    tokens = tokenize_string(sanitize_string(s))
+    tokens = [token for token in tokens if token not in stopwords]
+    return tokens
 
 # Check if any search token is in any target token
 def check_partial_match(search_tokens: list[str], target_tokens: list[str]) -> bool:
