@@ -3,6 +3,7 @@
 import argparse
 import json
 import string
+from nltk.stem import PorterStemmer
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -19,14 +20,16 @@ def main() -> None:
     stopwords = stopwords_file.read().splitlines()
     stopwords = [sanitize_string(word) for word in stopwords]
 
+    stemmer = PorterStemmer()
+
     matches = []
     match args.command:
         case "search":
             # print the search query here
-            tokens = generate_tokens(args.query, stopwords)
+            tokens = generate_tokens(args.query, stopwords, stemmer)
             print(f"Searching for: {args.query}")
             for movie in movies:
-                movie_tokens = generate_tokens(movie["title"], stopwords)
+                movie_tokens = generate_tokens(movie["title"], stopwords, stemmer)
                 if(check_partial_match(tokens, movie_tokens)):
                     matches.append(movie)
                     continue
@@ -48,9 +51,10 @@ def tokenize_string(s: str) -> list[str]:
     return tokens
     # tokens
 
-def generate_tokens(s: str, stopwords: list[str]) -> list[str]:
+def generate_tokens(s: str, stopwords: list[str], stemmer: PorterStemmer) -> list[str]:
     tokens = tokenize_string(sanitize_string(s))
     tokens = [token for token in tokens if token not in stopwords]
+    tokens = [stemmer.stem(token) for token in tokens]
     return tokens
 
 # Check if any search token is in any target token
