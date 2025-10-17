@@ -61,6 +61,18 @@ class InvertedIndex:
       return 0
     return self.term_frequencies[doc_id][token]
 
+  def get_idf(self, term: str) -> float:
+    docs_for_term = self.get_documents(term)
+    term_doc_count = len(docs_for_term)
+    total_doc_count = len(self.docmap.keys())
+
+    return math.log((total_doc_count + 1) / (term_doc_count + 1))
+
+  def get_tfidf(self, doc_id: str, term: str) -> float:
+    tf = self.get_tf(doc_id, term)
+    idf = self.get_idf(term)
+    return tf * idf
+  
   def build(self, movies):
     for i, movie in enumerate(movies):
        doc_id = i + 1
@@ -94,6 +106,10 @@ def main() -> None:
 
     idf_parser = subparsers.add_parser("idf", help="Get inverse document frequency")
     idf_parser.add_argument("term", type=str, help="Term")
+
+    tfidf_parser = subparsers.add_parser("tfidf", help="Get TF-IDF")
+    tfidf_parser.add_argument("doc_id", type=int, help="Document ID")
+    tfidf_parser.add_argument("term", type=str, help="Term")
 
     args = parser.parse_args()
 
@@ -143,12 +159,13 @@ def main() -> None:
             print(f"{tf}")
         case "idf":
             inverted_index = load_inverted_index(tokenizer)
-            docs_for_term = inverted_index.get_documents(args.term)
-            term_doc_count = len(docs_for_term)
-            total_doc_count = len(inverted_index.docmap.keys())
+            idf = inverted_index.get_idf(args.term)
             
-            idf = math.log((total_doc_count + 1) / (term_doc_count + 1))
             print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
+        case "tfidf":
+            inverted_index = load_inverted_index(tokenizer)
+            tf_idf = inverted_index.get_tfidf(args.doc_id, args.term)
+            print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
         case _:
             parser.print_help()
 
