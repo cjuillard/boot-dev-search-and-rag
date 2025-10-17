@@ -7,7 +7,7 @@ from collections import Counter
 from nltk.stem import PorterStemmer
 import pickle
 import os
-
+import math
 class Tokenizer:
   def __init__(self, stopwords: list[str], stemmer: PorterStemmer):
     self.stopwords = stopwords
@@ -45,10 +45,10 @@ class InvertedIndex:
       docsForToken.sort()
   
   def get_documents(self, term: str) -> list[int]:
-    term = term.lower()
-    if term not in self.index:
+    token = self.tokenizer.tokenize(term)[0]
+    if token not in self.index:
       return []
-    return self.index[term]
+    return self.index[token]
   
   def get_tf(self, doc_id: str, term: str) -> int:
     tokens = self.tokenizer.tokenize(term)
@@ -91,6 +91,9 @@ def main() -> None:
     tf_parser = subparsers.add_parser("tf", help="Get term frequency")
     tf_parser.add_argument("doc_id", type=int, help="Document ID")
     tf_parser.add_argument("term", type=str, help="Term")
+
+    idf_parser = subparsers.add_parser("idf", help="Get inverse document frequency")
+    idf_parser.add_argument("term", type=str, help="Term")
 
     args = parser.parse_args()
 
@@ -135,13 +138,24 @@ def main() -> None:
             doc_ids = inverted_index.get_documents("merida")
             print(f"First document for token 'merida' = {doc_ids[0]}")
         case "tf":
-            inverted_index = InvertedIndex(tokenizer)
-            inverted_index.load()
+            inverted_index = load_inverted_index(tokenizer)
             tf = inverted_index.get_tf(args.doc_id, args.term)
             print(f"{tf}")
+        case "idf":
+            inverted_index = load_inverted_index(tokenizer)
+            docs_for_term = inverted_index.get_documents(args.term)
+            term_doc_count = len(docs_for_term)
+            total_doc_count = len(inverted_index.docmap.keys())
+            
+            idf = math.log((total_doc_count + 1) / (term_doc_count + 1))
+            print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
         case _:
             parser.print_help()
 
+def load_inverted_index(tokenizer: Tokenizer) -> InvertedIndex:
+    inverted_index = InvertedIndex(tokenizer)
+    inverted_index.load()
+    return inverted_index
 
 translation_table = str.maketrans("", "", string.punctuation)
 def sanitize_string(s: str) -> str:
