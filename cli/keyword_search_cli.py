@@ -3,6 +3,7 @@
 import argparse
 import json
 import string
+from collections import Counter
 from nltk.stem import PorterStemmer
 import pickle
 import os
@@ -23,10 +24,16 @@ class InvertedIndex:
     self.tokenizer = tokenizer
     self.index = {}
     self.docmap = {}
+    self.term_frequencies = {}
   
   def __add_document(self, doc_id, text):
     tokens = self.tokenizer.tokenize(text)
+
+    counter = Counter()
+    self.term_frequencies[doc_id] = counter
+
     for token in tokens:
+      counter[token] += 1
       docsForToken = self.index.get(token, None)
       if docsForToken is None:
         docsForToken = []
@@ -43,6 +50,17 @@ class InvertedIndex:
       return []
     return self.index[term]
   
+  def get_tf(self, doc_id: str, term: str) -> int:
+    tokens = self.tokenizer.tokenize(term)
+    if(len(tokens) > 1):
+       raise ValueError("Term must be a single token")
+    token = tokens[0]
+    if doc_id not in self.term_frequencies:
+      return 0
+    if token not in self.term_frequencies[doc_id]:
+      return 0
+    return self.term_frequencies[doc_id][token]
+
   def build(self, movies):
     for i, movie in enumerate(movies):
        doc_id = i + 1
@@ -54,10 +72,12 @@ class InvertedIndex:
      os.makedirs("cache", exist_ok=True)
      pickle.dump(self.index, open("cache/index.pkl", "wb"))
      pickle.dump(self.docmap, open("cache/docmap.pkl", "wb"))
+     pickle.dump(self.term_frequencies, open("cache/term_frequencies.pkl", "wb"))
   
   def load(self):
     self.index = pickle.load(open("cache/index.pkl", "rb"))
     self.docmap = pickle.load(open("cache/docmap.pkl", "rb"))
+    self.term_frequencies = pickle.load(open("cache/term_frequencies.pkl", "rb"))
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -67,6 +87,10 @@ def main() -> None:
     search_parser.add_argument("query", type=str, help="Search query")
 
     build_parser = subparsers.add_parser("build", help="Build inverted index")
+
+    tf_parser = subparsers.add_parser("tf", help="Get term frequency")
+    tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    tf_parser.add_argument("term", type=str, help="Term")
 
     args = parser.parse_args()
 
@@ -83,7 +107,6 @@ def main() -> None:
     matches = []
     match args.command:
         case "search":
-            # print the search query here
             tokens = tokenizer.tokenize(args.query)
             inverted_index = InvertedIndex(tokenizer)
             inverted_index.load()
@@ -111,7 +134,11 @@ def main() -> None:
 
             doc_ids = inverted_index.get_documents("merida")
             print(f"First document for token 'merida' = {doc_ids[0]}")
-
+        case "tf":
+            inverted_index = InvertedIndex(tokenizer)
+            inverted_index.load()
+            tf = inverted_index.get_tf(args.doc_id, args.term)
+            print(f"{tf}")
         case _:
             parser.print_help()
 
