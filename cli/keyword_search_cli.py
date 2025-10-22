@@ -46,6 +46,9 @@ class InvertedIndex:
   
   def get_documents(self, term: str) -> list[int]:
     token = self.tokenizer.tokenize(term)[0]
+    return self.get_documents_for_token(token)
+  
+  def get_documents_for_token(self, token: str) -> list[int]:
     if token not in self.index:
       return []
     return self.index[token]
@@ -73,6 +76,18 @@ class InvertedIndex:
     idf = self.get_idf(term)
     return tf * idf
   
+  def get_bm25_idf(self, term: str) -> float:
+     tokens = self.tokenizer.tokenize(term)
+     if(len(tokens) > 1):
+       raise ValueError("Term must be a single token")
+     token = tokens[0]
+
+     docs_for_term = self.get_documents_for_token(token)
+     term_doc_count = len(docs_for_term)
+     total_doc_count = len(self.docmap.keys())
+
+     return math.log((total_doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
+  
   def build(self, movies):
     for i, movie in enumerate(movies):
        doc_id = i + 1
@@ -90,6 +105,17 @@ class InvertedIndex:
     self.index = pickle.load(open("cache/index.pkl", "rb"))
     self.docmap = pickle.load(open("cache/docmap.pkl", "rb"))
     self.term_frequencies = pickle.load(open("cache/term_frequencies.pkl", "rb"))
+
+def load_index_data() -> tuple[InvertedIndex, Tokenizer]:
+   stopwords_file = open("data/stopwords.txt")
+   stopwords = stopwords_file.read().splitlines()
+   stopwords = [sanitize_string(word) for word in stopwords]
+
+   stemmer = PorterStemmer()
+   tokenizer = Tokenizer(stopwords, stemmer)
+   inverted_index = InvertedIndex(tokenizer)
+   inverted_index.load()
+   return tokenizer, inverted_index
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -111,25 +137,15 @@ def main() -> None:
     tfidf_parser.add_argument("doc_id", type=int, help="Document ID")
     tfidf_parser.add_argument("term", type=str, help="Term")
 
+    bm25_idf_parser = subparsers.add_parser('bm25idf', help="Get BM25 IDF score for a given term")
+    bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF score for")
+
     args = parser.parse_args()
 
-    movies = json.load(open("data/movies.json"))["movies"]
-
-    
-    stopwords_file = open("data/stopwords.txt")
-    stopwords = stopwords_file.read().splitlines()
-    stopwords = [sanitize_string(word) for word in stopwords]
-
-    stemmer = PorterStemmer()
-    tokenizer = Tokenizer(stopwords, stemmer)
-
-    matches = []
     match args.command:
         case "search":
+            tokenizer, inverted_index = load_index_data()
             tokens = tokenizer.tokenize(args.query)
-            inverted_index = InvertedIndex(tokenizer)
-            inverted_index.load()
-
             print(f"Searching for: {args.query}")
 
             doc_ids = []
@@ -147,6 +163,7 @@ def main() -> None:
               print(f"{doc} - {movie['title']}")
               
         case "build":
+            movies = json.load(open("data/movies.json"))["movies"]
             inverted_index = InvertedIndex(tokenizer)
             inverted_index.build(movies)
             inverted_index.save()
@@ -154,25 +171,27 @@ def main() -> None:
             doc_ids = inverted_index.get_documents("merida")
             print(f"First document for token 'merida' = {doc_ids[0]}")
         case "tf":
-            inverted_index = load_inverted_index(tokenizer)
+            tokenizer, inverted_index = load_index_data()
             tf = inverted_index.get_tf(args.doc_id, args.term)
             print(f"{tf}")
         case "idf":
-            inverted_index = load_inverted_index(tokenizer)
+            tokenizer, inverted_index = load_index_data()
             idf = inverted_index.get_idf(args.term)
             
             print(f"Inverse document frequency of '{args.term}': {idf:.2f}")
         case "tfidf":
-            inverted_index = load_inverted_index(tokenizer)
+            tokenizer, inverted_index = load_index_data()
             tf_idf = inverted_index.get_tfidf(args.doc_id, args.term)
             print(f"TF-IDF score of '{args.term}' in document '{args.doc_id}': {tf_idf:.2f}")
+        case "bm25idf":
+            bm25_idf = bm25_idf_command(args.term)
+            print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
         case _:
             parser.print_help()
 
-def load_inverted_index(tokenizer: Tokenizer) -> InvertedIndex:
-    inverted_index = InvertedIndex(tokenizer)
-    inverted_index.load()
-    return inverted_index
+def bm25_idf_command(term: string) -> float:
+   tokenizer, inverted_index = load_index_data()
+   return inverted_index.get_bm25_idf(term)
 
 translation_table = str.maketrans("", "", string.punctuation)
 def sanitize_string(s: str) -> str:
