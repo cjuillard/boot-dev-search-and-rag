@@ -111,7 +111,7 @@ def main() -> None:
             results = inverted_index.bm25_search(args.query, args.limit)
             for index, result in enumerate(results):
                 doc = result['doc']
-                print(f"{index+1}. ({doc['id']}) - {doc['title']} - {round(result['score'],2)}")
+                print(f"{index+1}. ({doc['id']}) - {doc['title']} - {round(result['score'],2):.2f}")
         case _:
             parser.print_help()
 
