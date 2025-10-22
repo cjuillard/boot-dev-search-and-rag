@@ -107,13 +107,13 @@ class InvertedIndex:
   
   def get_bm25_idf(self, term: str) -> float:
      tokens = self.tokenizer.tokenize(term)
-     if(len(tokens) > 1):
+     if len(tokens) != 1:
        raise ValueError("Term must be a single token")
      token = tokens[0]
 
      docs_for_term = self.get_documents_for_token(token)
      term_doc_count = len(docs_for_term)
-     total_doc_count = len(self.docmap.keys())
+     total_doc_count = len(self.docmap)
 
      return math.log((total_doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
   
@@ -122,8 +122,11 @@ class InvertedIndex:
 
     # Length normalization factor
     avg_doc_length = self.__get_avg_doc_length()
-    doc_length = self.document_lengths[doc_id]
-    length_norm = 1 - b + b * (doc_length / avg_doc_length)
+    doc_length = self.document_lengths.get(doc_id, 0)
+    if avg_doc_length == 0:
+      length_norm = 1
+    else:
+      length_norm = 1 - b + b * (doc_length / avg_doc_length)
 
     return (tf * (k1 + 1)) / (tf + k1 * length_norm)
   
@@ -146,4 +149,21 @@ class InvertedIndex:
     self.docmap = pickle.load(open(f"{CACHE_DIR}/docmap.pkl", "rb"))
     self.term_frequencies = pickle.load(open(f"{CACHE_DIR}/term_frequencies.pkl", "rb"))
     self.document_lengths = pickle.load(open(f"{CACHE_DIR}/document_lengths.pkl", "rb"))
+  
+  def bm25(self, doc_id, term) -> float:
+    idf = self.get_bm25_idf(term)
+    tf = self.get_bm25_tf(doc_id, term)
+    return tf * idf
+  
+  def bm25_search(self, query, limit) -> list[any]:
+    tokens = self.tokenizer.tokenize(query)
+    scores = {}
+    for doc_id in self.docmap:
+      score = 0
+      for token in tokens:
+        score += self.bm25(doc_id, token)
+      scores[doc_id] = score
 
+    
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+    return [{'doc': self.docmap[doc_id], 'score': score} for doc_id, score in sorted_scores]
