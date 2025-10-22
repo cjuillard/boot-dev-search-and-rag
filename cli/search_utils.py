@@ -5,6 +5,9 @@ import pickle
 import os
 import math
 
+# Parameter to increase or decrease the importance of a term's frequency as the frequency increases.
+# Larger values mean less falloff in importance as the frequency increases.
+BM25_K1 = 1.5
 
 translation_table = str.maketrans("", "", string.punctuation)
 
@@ -97,6 +100,10 @@ class InvertedIndex:
      total_doc_count = len(self.docmap.keys())
 
      return math.log((total_doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
+  
+  def get_bm25_tf(self, doc_id: int, term: str, k1: float = BM25_K1) -> float:
+    tf = self.get_tf(doc_id, term)
+    return (tf * (k1 + 1)) / (tf + k1)
   
   def build(self, movies):
     for i, movie in enumerate(movies):

@@ -4,7 +4,7 @@ import argparse
 import json
 import string
 from nltk.stem import PorterStemmer
-from search_utils import Tokenizer, InvertedIndex, sanitize_string
+from search_utils import Tokenizer, InvertedIndex, sanitize_string, BM25_K1
 
 def load_tokenizer() -> Tokenizer:
    stopwords_file = open("data/stopwords.txt")
@@ -43,6 +43,13 @@ def main() -> None:
 
     bm25_idf_parser = subparsers.add_parser('bm25idf', help="Get BM25 IDF score for a given term")
     bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF score for")
+
+    bm25_tf_parser = subparsers.add_parser(
+      "bm25tf", help="Get BM25 TF score for a given document ID and term"
+    )
+    bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
+    bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
 
     args = parser.parse_args()
 
@@ -91,12 +98,19 @@ def main() -> None:
         case "bm25idf":
             bm25_idf = bm25_idf_command(args.term)
             print(f"BM25 IDF score of '{args.term}': {bm25_idf:.2f}")
+        case "bm25tf":
+            bm25_tf = bm25_tf_command(args.doc_id, args.term, args.k1)
+            print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25_tf:.2f}")
         case _:
             parser.print_help()
 
 def bm25_idf_command(term: string) -> float:
    tokenizer, inverted_index = load_index_data()
    return inverted_index.get_bm25_idf(term)
+
+def bm25_tf_command(doc_id: int, term: string, k1: float = BM25_K1) -> float:
+   tokenizer, inverted_index = load_index_data()
+   return inverted_index.get_bm25_tf(doc_id, term, k1)
 
 # Check if any search token is in any target token
 def check_partial_match(search_tokens: list[str], target_tokens: list[str]) -> bool:
