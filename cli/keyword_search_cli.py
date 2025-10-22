@@ -4,7 +4,7 @@ import argparse
 import json
 import string
 from nltk.stem import PorterStemmer
-from search_utils import Tokenizer, InvertedIndex, sanitize_string, BM25_K1
+from search_utils import Tokenizer, InvertedIndex, sanitize_string, BM25_K1, BM25_B
 
 def load_tokenizer() -> Tokenizer:
    stopwords_file = open("data/stopwords.txt")
@@ -50,6 +50,7 @@ def main() -> None:
     bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
     bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
     bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
+    bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 b parameter")
 
     args = parser.parse_args()
 
